@@ -3,7 +3,7 @@
   "name": "screen-clean",
   "title": "Screen Clean",
   "description": "Black out every display and optionally lock the keyboard so you can clean your screen and keyboard.",
-  "icon": "extension-icon.png",
+  "icon": "icon.png",
   "author": "yanggong-zi",
   "platforms": [
     "Windows",
