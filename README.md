@@ -1,30 +1,60 @@
+English | [简体中文](README.zh-CN.md)
+
 # Screen Clean
 
-Raycast extension for cleaning your screen and keyboard. It covers every display with a pure black
-window and, optionally, locks the keyboard globally. It works on **macOS** and **Windows**. No data
-is collected or sent anywhere.
+A Raycast extension that turns every display pure black and optionally locks the keyboard, so you
+can clean your screen and keyboard without triggering shortcuts. It works on **macOS** and
+**Windows**. No data is collected or sent anywhere.
+
+## Features
+
+- Pure black, borderless overlay on every connected display
+- Optional system-wide keyboard lock (strict mode)
+- Exit by pressing `Esc` 5 times, with an on-screen counter
+- Automatic timeout, configurable from 30 seconds to 5 minutes
+- Hard 30-minute fail-safe when using "until manually stopped"
+- Display sleep is prevented while cleaning
+- Mouse input is never blocked, so you can always wait out the timer
+- No network access, no telemetry
 
 ## Commands
 
-| Command                            | What it does                                               |
-| ---------------------------------- | ---------------------------------------------------------- |
-| **Start Cleaning Mode**            | Blacks out all displays. Press `Esc` 5 times to exit.      |
-| **Stop Cleaning Mode**             | Terminates the overlay immediately.                        |
-| **Grant Keyboard Lock Permission** | macOS only: requests Accessibility permission.             |
+| Command                            | Description                                                   |
+| ---------------------------------- | ------------------------------------------------------------- |
+| **Start Cleaning Mode**            | Blacks out every display. Press `Esc` 5 times to exit.        |
+| **Stop Cleaning Mode**             | Ends cleaning mode immediately.                               |
+| **Grant Keyboard Lock Permission** | macOS only. Requests Accessibility permission for the helper. |
 
-The session always ends automatically (default 60 seconds, configurable in the extension
-preferences). The "until manually stopped" option is hard-capped at 30 minutes as a fail-safe.
+## Preferences
+
+| Preference               | Default   | Description                                                                                                          |
+| ------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Cleaning Duration**    | 5 minutes | 30 seconds, 1 minute, 2 minutes, 5 minutes, or "until manually stopped" (capped at 30 minutes).                      |
+| **Strict Keyboard Lock** | Off       | Globally swallow keyboard events. On macOS this needs Accessibility permission; on Windows it uses a low-level hook. |
+| **Exit Hint**            | On        | Show a faint exit hint when cleaning starts and when the overlay is clicked. The Esc counter is always shown.        |
+
+The session always ends automatically, even when "until manually stopped" is selected.
+
+## Usage
+
+1. Open Raycast and run **Start Cleaning Mode**.
+2. Every display goes black. The hint and the Esc counter appear in the center of each screen.
+3. Press `Esc` 5 times to exit. The counter shows `2/5`, `3/5`, and so on.
+4. If you pause for more than 2 seconds between presses, the count resets.
+
+Use **Stop Cleaning Mode** to end a session immediately.
 
 ## How it works
 
-Raycast commands cannot draw their own full-screen windows, so the extension ships a native helper
-per platform. The Raycast command spawns it detached and exits; the helper keeps running.
+Raycast commands cannot draw their own full-screen windows, so the extension spawns a small native
+helper per platform and exits. The helper keeps running independently.
 
 ### macOS
 
-Helper: `assets/ScreenCleaner` — universal binary (arm64 + x86_64), built from `native/main.swift`.
+The helper is `assets/ScreenCleaner`, a universal binary (arm64 + x86_64) built from
+`native/main.swift`.
 
-```
+```text
 Raycast no-view command
   └─ spawn detached → ScreenCleaner
        ├─ one borderless black NSWindow per display, level = CGShieldingWindowLevel()
@@ -33,48 +63,95 @@ Raycast no-view command
        └─ prevents display sleep while cleaning
 ```
 
-- Strict keyboard lock requires Accessibility permission. Without it, the helper falls back to
-  passive mode (the overlay still receives and swallows keys while it is focused) and shows a hint.
-- The helper is copied to the extension's support directory before every run, so its path and code
-  signature stay stable (important for the Accessibility permission).
+- The helper is copied to the extension's support directory before each run. This keeps its path
+  and code signature stable, which matters for the Accessibility permission.
+- Without Accessibility permission, strict keyboard lock falls back to passive mode: the overlay
+  still receives and swallows keys while it is focused, and a hint explains the fallback.
 
 ### Windows
 
-Helper: `assets/ScreenCleaner.ps1`, run with Windows PowerShell 5.1. It compiles a small C# helper
-in memory with `Add-Type`:
+The helper is `assets/ScreenCleaner.ps1`, executed with Windows PowerShell 5.1. It compiles a small
+C# helper in memory with `Add-Type`:
 
-- one borderless, topmost black WinForms window per monitor (`Screen.AllScreens`)
-- optional `WH_KEYBOARD_LL` low-level keyboard hook that swallows every key system-wide
-- the same 5 Esc press gesture with an on-screen counter, plus the auto-exit timer
-- prevents display sleep with `SetThreadExecutionState`
-- `Stop Cleaning Mode` terminates the PowerShell process with `taskkill`
+- One borderless, topmost black WinForms window per monitor (`Screen.AllScreens`)
+- Optional `WH_KEYBOARD_LL` low-level keyboard hook that swallows every key system-wide
+- The same 5 Esc press gesture and on-screen counter, plus the auto-exit timer
+- Display sleep prevention via `SetThreadExecutionState`
+- **Stop Cleaning Mode** terminates the PowerShell process with `taskkill`
 
 The first start takes an extra second or two because the embedded C# code is compiled on the fly.
-If compilation or startup fails, the error is written to `<extension support dir>/screen-cleaner.log`.
+If compilation or startup fails, the error is written to
+`<extension support directory>/screen-cleaner.log`.
 
-Common behavior on both platforms:
+## Installation
 
-- Mouse input is not blocked. Pressing `Esc` 5 times works in both modes. The counter (`2/5`,
-  `3/5`, …) is shown in the center of the screen at 18 pt; it resets if you pause for more than
-  2 seconds.
-- The hint text and counter are centered on every display.
+### Requirements
+
+- **Raycast** on macOS or Windows
+- **macOS 12 or newer** for the macOS helper
+- **Windows 10/11** with the built-in Windows PowerShell 5.1 for the Windows helper
+- **Node.js 20+** and **Xcode Command Line Tools** (macOS only) for development
+
+### From source
+
+```bash
+git clone git@github.com:YangGong-Zi/screen-clean.git
+cd screen-clean
+npm install
+npm run dev
+```
+
+`npm run dev` rebuilds or refreshes the native helpers, then starts Raycast development mode.
+
+### Production build
+
+```bash
+npm run build
+```
+
+## Strict keyboard lock setup
+
+### macOS
+
+1. Run **Grant Keyboard Lock Permission** from Raycast.
+2. Enable **ScreenCleaner** in _System Settings → Privacy & Security → Accessibility_. The helper
+   path is copied to the clipboard; if it is not listed, click `+` and paste it.
+3. Turn on **Strict Keyboard Lock** in the extension preferences.
+
+TCC permissions are bound to the helper's path and code signature. Rebuilding the helper with
+different contents may require granting the permission again.
+
+### Windows
+
+No extra permission is required. Turn on **Strict Keyboard Lock** in the extension preferences; the
+helper installs a low-level keyboard hook.
+
+If the hook cannot be installed, the helper falls back to passive mode and shows a hint.
+
+## Safety and limitations
+
+- This is a cleaning cover, **not a security lock**. The power button, Touch ID / Windows Hello,
+  `Ctrl+Alt+Del`, the UAC secure desktop, and other OS-level mechanisms still work.
+- The auto-exit timer is always active. The "until manually stopped" option exits after 30 minutes.
+- If the overlay gets stuck, the timer will release it. On macOS, force restart the Mac as a last
+  resort: strict mode blocks keyboard input globally, so typing `pkill` is not possible while it is
+  active. On Windows, `Ctrl+Alt+Del` still opens the secure screen.
+- The mouse cursor stays visible.
+- On Windows, some antivirus products may flag a process that installs a global keyboard hook. The
+  hook is only required for strict keyboard lock; passive mode works without it.
+- Enterprise policies may block `Add-Type` or global hooks. Check the log file if the Windows helper
+  does not start.
 
 ## Development
 
 ```bash
-npm install
-npm run dev          # refreshes helpers, then starts Raycast dev mode
-```
-
-Other scripts:
-
-```bash
-npm run build:helper # copies the Windows helper; on macOS also compiles assets/ScreenCleaner
+npm run dev          # refresh helpers, then start Raycast dev mode
+npm run build:helper # copy the Windows helper; on macOS, also compile assets/ScreenCleaner
 npm run build        # helpers + Raycast production build
 npm run lint
 ```
 
-Manual tests (each blacks the screen for 2 seconds):
+Manual helper tests (each blacks the screen for about 2 seconds):
 
 ```bash
 # macOS
@@ -84,39 +161,12 @@ Manual tests (each blacks the screen for 2 seconds):
 powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File .\assets\ScreenCleaner.ps1 -Seconds 2
 ```
 
-## Strict keyboard lock setup
-
-**macOS**
-
-1. Run **Grant Keyboard Lock Permission** from Raycast.
-2. Enable **ScreenCleaner** in _System Settings → Privacy & Security → Accessibility_. The helper
-   path is copied to the clipboard; if it is not in the list, click `+` and paste it.
-3. Enable **Strict Keyboard Lock** in the extension preferences.
-
-TCC permissions are bound to the binary's path and signature. Rebuilding the helper with different
-contents may require granting the permission again.
-
-**Windows**
-
-No permission is required. Enable **Strict Keyboard Lock** in the extension preferences; the helper
-installs a low-level keyboard hook. If the hook cannot be installed, it falls back to passive mode
-and shows a hint.
-
-## Safety notes
-
-- This is a cleaning cover, **not a security lock**. The power button, Touch ID / Windows Hello,
-  `Ctrl+Alt+Del`, UAC secure desktop and other OS-level mechanisms still work.
-- The auto-exit timer is always active. The "until manually stopped" option exits after 30 minutes.
-- If the overlay ever gets stuck, the timer will release it. On macOS, as a last resort, force
-  restart — strict mode blocks keyboard input globally, so typing `pkill` is not an option while it
-  is active. On Windows, `Ctrl+Alt+Del` can still open the secure screen.
-- The cursor stays visible.
-- On Windows, some antivirus products may flag a process that installs a global keyboard hook. The
-  hook is required for strict keyboard lock; passive mode works without it.
+Raycast persists values that users select in Preferences. Changing a `default` in `package.json`
+only affects users who have not already set that preference.
 
 ## Project layout
 
-```
+```text
 src/
   start-cleaning.ts           # Raycast commands
   stop-cleaning.ts
@@ -133,8 +183,13 @@ assets/
   ScreenCleaner.ps1           # generated copy of the Windows helper
 ```
 
-## Store publishing
+## Publishing to the Raycast Store
 
-Keep `native/` and `scripts/build-helper.cjs` in the repository so reviewers can verify the sources.
-The macOS helper is a prebuilt universal binary; confirm the Raycast Store policy on bundled
-binaries before publishing. Rebuild with `npm run build:helper` whenever a helper source changes.
+Keep `native/` and `scripts/build-helper.cjs` in the repository so reviewers can verify the helper
+sources. The macOS helper is a prebuilt universal binary, so check the Raycast Store's current
+requirements for bundled binaries and repository visibility before publishing. Rebuild the helpers
+with `npm run build:helper` whenever their sources change.
+
+## Repository
+
+<https://github.com/YangGong-Zi/screen-clean>

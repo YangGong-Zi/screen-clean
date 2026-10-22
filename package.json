@@ -20,7 +20,7 @@
       "description": "How long the screen stays black. The session always ends automatically.",
       "type": "dropdown",
       "required": true,
-      "default": "60",
+      "default": "300",
       "data": [
         {
           "title": "30 seconds",
